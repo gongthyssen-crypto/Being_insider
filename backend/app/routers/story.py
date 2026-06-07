@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 import httpx
@@ -28,7 +29,7 @@ from app.session_store import (
 )
 
 router = APIRouter(prefix="/api", tags=["story"])
-MAX_TURNS = 8
+MAX_TURNS = 10
 
 
 def _seed_payload(scenario_id: str) -> ScenarioSeed:
@@ -44,6 +45,7 @@ def _bundle_to_snapshot(bundle: dict) -> SessionSnapshot:
         latest_narration=bundle["latest_narration"],
         next_prompt_hint=bundle["next_prompt_hint"],
         runtime_mode=bundle["runtime_mode"],
+        ending=bundle.get("ending"),
     )
 
 
@@ -81,6 +83,37 @@ def _next_time_label(era: str, turn_index: int) -> str:
     return f"{era} · 第 {turn_index} 回合后"
 
 
+def _summarize_action(action_text: str) -> str:
+    normalized = " ".join(action_text.split())
+    fragments = [
+        segment.strip(" 、")
+        for segment in re.split(r"[，。；;,.!?！？\n]+", normalized)
+        if segment.strip()
+    ]
+    if not fragments:
+        return "推进当前部署"
+
+    summary = "、".join(fragments[:2])
+    if len(summary) > 26:
+        summary = f"{summary[:26].rstrip('、，, ')}..."
+    return summary
+
+
+def _build_stage_ending(
+    seed: ScenarioSeed,
+    action_summary: str,
+    action_mode: str,
+    outcome_summary: str,
+) -> str:
+    return (
+        "阶段性结局："
+        f"你在本局中围绕“{action_summary}”逐步形成了一条以{action_mode}为主的推进路线，"
+        f"并让局势暂时朝着更有利于你的方向偏移。{outcome_summary}"
+        f"不过，{seed.failure_risk}仍然没有被真正消化，这会成为下一阶段最现实的反扑来源。"
+        f"换句话说，你已经初步稳住了这一局，但还没有彻底锁死结局，历史接下来仍可能沿着这条路径继续分化。"
+    )
+
+
 def _build_turn_result(
     session: SessionState,
     seed: ScenarioSeed,
@@ -88,27 +121,28 @@ def _build_turn_result(
     runtime_mode: str = "local-fallback",
 ) -> TurnResult:
     action_mode, outcome_summary = _classify_action(action_text)
+    action_summary = _summarize_action(action_text)
     new_turn_index = session.turn_index + 1
     ai_narration = (
-        f"你以“{action_text}”作为本轮决策。{seed.player_role}一方很快感受到这一步的"
+        f"你本轮选择先{action_summary}。{seed.player_role}一方很快感受到这一步的"
         f"{action_mode}意味，周围势力开始重新判断你的底线与能力。"
         f"在 {seed.historical_anchor} 这一历史背景下，这种动作不会只改变眼前局面，"
         "还会重塑他人对你后续路线的预期。"
     )
-    world_update = (
-        f"围绕“{action_text}”的行动已经让局势出现新偏移：{outcome_summary}"
-    )
+    world_update = f"围绕你推进的“{action_summary}”，局势已经出现新的偏移：{outcome_summary}"
     next_prompt_hint = (
         "下一轮可以继续写你如何巩固这一决定、修补副作用，或者转向处理新的风险点。"
     )
     ending = None
     status = "active"
 
-    if new_turn_index >= 5:
+    if new_turn_index >= MAX_TURNS:
         status = "ended"
-        ending = (
-            f"推演暂时走到一个阶段性结局：你围绕“{action_text}”建立了当前路线，"
-            "但这条路线能否最终改写历史，还取决于更长期的资源、盟友与节奏控制。"
+        ending = _build_stage_ending(
+            seed=seed,
+            action_summary=action_summary,
+            action_mode=action_mode,
+            outcome_summary=outcome_summary,
         )
         next_prompt_hint = "本局已进入阶段性结尾，可以复盘路径或重新开局。"
 
@@ -162,6 +196,7 @@ def _build_turn_result_from_resolution(
     runtime_mode: str,
 ) -> TurnResult:
     new_turn_index = session.turn_index + 1
+    action_summary = _summarize_action(action_text)
     ending = resolution.get("ending")
     status = "active"
     next_prompt_hint = resolution.get("next_prompt_hint") or (
@@ -169,16 +204,18 @@ def _build_turn_result_from_resolution(
     )
 
     if new_turn_index >= MAX_TURNS and not ending:
-        ending = (
-            f"推演进入阶段性结尾：围绕“{action_text}”所展开的路线已经初步成形，"
-            "接下来历史会沿着这条路径继续分化，但本局先停在这个阶段。"
+        ending = _build_stage_ending(
+            seed=seed,
+            action_summary=action_summary,
+            action_mode="推进",
+            outcome_summary=outcome_summary,
         )
 
     if ending:
         status = "ended"
 
     ai_narration = resolution.get("ai_narration") or (
-        f"你以“{action_text}”作为本轮决策，局势随即出现新的震动。"
+        f"你本轮选择先{action_summary}，局势随即出现新的震动。"
     )
     outcome_summary = resolution.get("outcome_summary") or (
         "这一决策已经改变了局势平衡，但新的后果仍在继续显现。"
@@ -328,5 +365,6 @@ def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
         result.turn.ai_narration,
         result.next_prompt_hint,
         result.runtime_mode,
+        result.ending,
     )
     return result

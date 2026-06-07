@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $pidFile = Join-Path $root ".runtime\\backend.pid"
 
-if (-not (Test-Path $pidFile)) {
+if (-not (Test-Path -LiteralPath $pidFile)) {
     Write-Host "Backend is not running."
     exit 0
 }
@@ -15,5 +15,7 @@ if ($process) {
     Stop-Process -Id $targetPid -Force
 }
 
-Remove-Item $pidFile -Force
+if (Test-Path -LiteralPath $pidFile) {
+    Microsoft.PowerShell.Management\Remove-Item -LiteralPath $pidFile -Force
+}
 Write-Host "Backend stopped."

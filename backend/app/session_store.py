@@ -45,6 +45,7 @@ def create_session(scenario_id: str) -> dict:
         "latest_narration": seed["opening_situation"],
         "next_prompt_hint": seed["opening_prompt_hint"],
         "runtime_mode": current_model_mode(),
+        "ending": None,
     }
     return deepcopy(SESSIONS[session_id])
 
@@ -73,6 +74,7 @@ def save_turn_result(
     latest_narration: str,
     next_prompt_hint: str,
     runtime_mode: str,
+    ending: str | None = None,
 ) -> dict:
     bundle = SESSIONS.get(session_id)
     if bundle is None:
@@ -82,4 +84,5 @@ def save_turn_result(
     bundle["latest_narration"] = latest_narration
     bundle["next_prompt_hint"] = next_prompt_hint
     bundle["runtime_mode"] = runtime_mode
+    bundle["ending"] = ending
     return deepcopy(bundle)

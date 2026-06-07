@@ -51,7 +51,13 @@ Requirements:
   "next_prompt_hint": "string",
   "ending": null
 }}
-6. If the situation has clearly reached a stage ending, set "ending" to a short ending paragraph. Otherwise use null.
+6. Never quote, copy, or closely paraphrase the player's action verbatim. Summarize the action in your own words before judging consequences.
+7. Keep "outcome_summary" and "world_update" concise and non-redundant. Do not repeat the same sentence across fields.
+8. If the situation has clearly reached a stage ending, set "ending" to a concise ending paragraph that explicitly states:
+   - what the player has achieved in this stage,
+   - what major risk or unresolved cost remains,
+   - what direction the situation is likely to move next.
+   Otherwise use null.
 """.strip()
 
 
@@ -101,6 +107,7 @@ def build_messages(
                 f"- pressure_points: {'; '.join(session.world_summary.pressure_points)}\n"
                 f"- recent_shift: {session.world_summary.recent_shift}\n\n"
                 f"Current player action:\n{action_text}\n\n"
+                f"Do not quote or repeat the current player action verbatim. Summarize it in your own words.\n"
                 f"Return only valid json."
             ),
         }

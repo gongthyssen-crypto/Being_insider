@@ -11,15 +11,15 @@ $backendDir = Join-Path $root "backend"
 
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
-if (Test-Path $pidFile) {
+if (Test-Path -LiteralPath $pidFile) {
     [int]$existingPid = Get-Content $pidFile | Select-Object -First 1
     $existingProcess = Get-Process -Id $existingPid -ErrorAction SilentlyContinue
     if ($existingProcess) {
         Write-Host "Backend already running on PID $existingPid"
         exit 0
     }
-    if (Test-Path $pidFile) {
-        Remove-Item $pidFile -Force
+    if (Test-Path -LiteralPath $pidFile) {
+        Microsoft.PowerShell.Management\Remove-Item -LiteralPath $pidFile -Force
     }
 }
 
@@ -36,5 +36,5 @@ $process = Start-Process `
     -PassThru `
     -WindowStyle Hidden
 
-Set-Content -Path $pidFile -Value $process.Id
+Microsoft.PowerShell.Management\Set-Content -LiteralPath $pidFile -Value ([string]$process.Id)
 Write-Host "Backend started: http://127.0.0.1:18421"

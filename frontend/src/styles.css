@@ -212,11 +212,12 @@ button {
 
 .scenario-home-art {
   position: relative;
-  min-height: 220px;
+  min-height: 236px;
   border-bottom: 1px solid rgba(185, 139, 90, 0.22);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.04)),
-    linear-gradient(165deg, rgba(130, 94, 61, 0.12), transparent 54%);
+  background-color: rgba(243, 236, 224, 0.88);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .scenario-home-art::before,
@@ -230,34 +231,22 @@ button {
 
 .tone-yuan .scenario-home-art::before,
 .tone-yuan.detail-hero::before {
-  background:
-    linear-gradient(180deg, rgba(58, 46, 39, 0.12), transparent 42%),
-    radial-gradient(circle at 80% 28%, rgba(92, 68, 50, 0.12), transparent 24%),
-    linear-gradient(150deg, transparent 40%, rgba(76, 64, 56, 0.18) 40%, transparent 44%),
-    linear-gradient(178deg, transparent 54%, rgba(99, 77, 55, 0.14) 54%, transparent 57%);
+  background: linear-gradient(180deg, rgba(54, 44, 38, 0.12), rgba(54, 44, 38, 0.03) 42%, rgba(255, 255, 255, 0) 100%);
 }
 
 .tone-zhang .scenario-home-art::before,
 .tone-zhang.detail-hero::before {
-  background:
-    linear-gradient(180deg, rgba(106, 81, 55, 0.12), transparent 42%),
-    linear-gradient(180deg, transparent 52%, rgba(125, 92, 60, 0.18) 52%, transparent 56%),
-    linear-gradient(90deg, transparent 38%, rgba(127, 98, 66, 0.12) 38%, transparent 42%);
+  background: linear-gradient(180deg, rgba(106, 81, 55, 0.1), rgba(106, 81, 55, 0.03) 40%, rgba(255, 255, 255, 0) 100%);
 }
 
 .tone-li .scenario-home-art::before,
 .tone-li.detail-hero::before {
-  background:
-    linear-gradient(180deg, rgba(121, 79, 53, 0.14), transparent 42%),
-    radial-gradient(circle at 24% 68%, rgba(120, 72, 49, 0.14), transparent 22%),
-    linear-gradient(166deg, transparent 50%, rgba(126, 72, 50, 0.2) 50%, transparent 54%);
+  background: linear-gradient(180deg, rgba(121, 79, 53, 0.12), rgba(121, 79, 53, 0.04) 42%, rgba(255, 255, 255, 0) 100%);
 }
 
 .scenario-home-art::after {
-  background:
-    radial-gradient(circle at 22% 78%, rgba(112, 83, 57, 0.12), transparent 18%),
-    linear-gradient(180deg, transparent 58%, rgba(128, 95, 65, 0.16) 58%, transparent 62%);
-  opacity: 0.7;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+  opacity: 0.55;
 }
 
 .scenario-home-seal {
@@ -279,9 +268,9 @@ button {
 
 .scenario-home-copy {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto auto auto auto 1fr auto;
   gap: 12px;
-  padding: 26px 28px 28px;
+  padding: 28px 28px 30px;
 }
 
 .scenario-home-label {
@@ -292,7 +281,8 @@ button {
 .scenario-home-copy h2 {
   margin: 0;
   font-family: "STSong", "Songti SC", "Noto Serif SC", "SimSun", serif;
-  font-size: 2rem;
+  font-size: 2.06rem;
+  line-height: 1.2;
   color: #4c2d1b;
 }
 
@@ -309,14 +299,18 @@ button {
   color: #775a3e;
 }
 
+.scenario-home-summary {
+  min-height: 5.4em;
+}
+
 .scenario-home-note {
-  padding-top: 2px;
+  padding-top: 4px;
   font-size: 0.96rem;
 }
 
 .home-enter-button {
   justify-self: start;
-  margin-top: 10px;
+  margin-top: 18px;
 }
 
 .home-footer {
@@ -360,6 +354,25 @@ button {
   padding: 22px 24px;
 }
 
+.detail-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.12;
+  filter: saturate(0.78) sepia(0.08);
+}
+
+.detail-hero-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(252, 247, 239, 0.94) 0%, rgba(252, 247, 239, 0.9) 42%, rgba(252, 247, 239, 0.78) 64%, rgba(252, 247, 239, 0.68) 100%),
+    linear-gradient(180deg, rgba(255, 252, 246, 0.12), rgba(248, 241, 229, 0.22));
+}
+
 .detail-hero-copy,
 .detail-hero-side {
   position: relative;
@@ -401,8 +414,7 @@ button {
 .hero-narration,
 .info-card p,
 .summary-item p,
-.latest-cell p,
-.timeline-item p {
+.latest-cell p {
   margin: 0;
   color: var(--ink-soft);
   line-height: 1.8;
@@ -429,6 +441,24 @@ button {
   margin: 0;
   color: var(--ink-soft);
   line-height: 1.75;
+}
+
+.detail-portrait-frame {
+  width: 100%;
+  max-width: 288px;
+  justify-self: start;
+  overflow: hidden;
+  border: 1px solid rgba(185, 139, 90, 0.24);
+  background: rgba(255, 250, 242, 0.82);
+  box-shadow: 0 18px 28px rgba(103, 74, 43, 0.12);
+}
+
+.detail-portrait-image {
+  display: block;
+  width: 100%;
+  height: 430px;
+  object-fit: cover;
+  object-position: center top;
 }
 
 .detail-hero-badge {
@@ -712,6 +742,42 @@ button {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.ending-card {
+  display: grid;
+  gap: 14px;
+  margin: 0 20px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 225, 190, 0.16);
+  background: linear-gradient(180deg, rgba(251, 241, 223, 0.98), rgba(244, 227, 196, 0.98));
+  color: #4a2a1a;
+}
+
+.ending-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ending-kicker,
+.ending-turns {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid rgba(143, 64, 43, 0.18);
+  background: rgba(255, 250, 242, 0.58);
+  color: #7a4d2b;
+  font-size: 0.9rem;
+}
+
+.ending-card p {
+  margin: 0;
+  color: #5b3a24;
+  line-height: 1.9;
+}
+
 .latest-turn {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -772,27 +838,141 @@ button {
   grid-template-columns: 1fr;
 }
 
-.timeline-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 10px;
+.history-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 
-.timeline-item {
+.history-summary p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.history-active-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(185, 139, 90, 0.22);
+  background: rgba(255, 250, 242, 0.84);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.timeline-rail {
+  border: 1px solid rgba(185, 139, 90, 0.18);
+  background: rgba(255, 251, 244, 0.66);
+  padding: 16px;
+}
+
+.timeline-empty {
+  color: var(--ink-soft);
+  line-height: 1.75;
+}
+
+.timeline-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+}
+
+.timeline-track {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 240px);
+  gap: 18px;
+  align-items: start;
+  min-width: max-content;
+  padding: 18px 4px 6px;
+}
+
+.timeline-track::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 34px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(185, 139, 90, 0.18), rgba(185, 139, 90, 0.45), rgba(185, 139, 90, 0.18));
+}
+
+.timeline-node {
+  position: relative;
   display: grid;
   gap: 8px;
-  min-height: 100%;
-  padding: 14px;
+  min-height: 220px;
+  padding: 38px 14px 14px;
+  text-align: left;
+  cursor: pointer;
   border: 1px solid rgba(185, 139, 90, 0.18);
   background: rgba(255, 251, 244, 0.76);
+  color: var(--ink);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.timeline-item.latest {
-  border-color: rgba(143, 64, 43, 0.38);
-  background: rgba(248, 235, 217, 0.94);
+.timeline-node:hover {
+  transform: translateY(-2px);
+  border-color: rgba(143, 64, 43, 0.28);
+  background: rgba(250, 241, 228, 0.9);
 }
 
-.timeline-mode {
+.timeline-node.active {
+  border-color: rgba(143, 64, 43, 0.42);
+  background: rgba(248, 235, 217, 0.96);
+  box-shadow: 0 18px 32px rgba(103, 74, 43, 0.12);
+}
+
+.timeline-node-dot {
+  position: absolute;
+  top: 25px;
+  left: 18px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(185, 139, 90, 0.6);
+  border-radius: 999px;
+  background: #f9f2e4;
+  box-shadow: 0 0 0 5px rgba(244, 239, 229, 0.95);
+}
+
+.timeline-node.active .timeline-node-dot {
+  border-color: rgba(143, 64, 43, 0.72);
+  background: linear-gradient(180deg, #bb5a3c, #8f3b27);
+}
+
+.timeline-node-index {
+  color: var(--gold);
+  font-size: 0.92rem;
+}
+
+.timeline-node strong {
+  color: #4c2d1b;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.timeline-node small,
+.timeline-node em {
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.timeline-node small {
+  font-size: 0.9rem;
+}
+
+.timeline-node em {
+  margin-top: auto;
+  font-style: normal;
   color: var(--jade);
   font-size: 0.85rem;
 }
@@ -840,8 +1020,7 @@ button {
   .home-card-grid,
   .detail-info-grid,
   .summary-grid,
-  .latest-grid,
-  .timeline-list {
+  .latest-grid {
     grid-template-columns: 1fr;
   }
 
@@ -854,7 +1033,9 @@ button {
   .detail-topbar,
   .panel-head,
   .detail-hero-title-row,
-  .action-toolbar {
+  .action-toolbar,
+  .history-summary,
+  .ending-head {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -866,5 +1047,9 @@ button {
 
   .home-title {
     font-size: clamp(3rem, 16vw, 4.4rem);
+  }
+
+  .timeline-track {
+    grid-auto-columns: minmax(200px, 220px);
   }
 }

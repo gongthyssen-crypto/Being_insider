@@ -58,6 +58,7 @@ class SessionSnapshot(BaseModel):
     latest_narration: str
     next_prompt_hint: str
     runtime_mode: str
+    ending: str | None = None
 
 
 class CreateSessionRequest(BaseModel):

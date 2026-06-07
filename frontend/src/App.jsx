@@ -8,18 +8,30 @@ const SCENARIO_DECOR = {
     label: "清末外交",
     description: "朝鲜宫廷、宗主体系与日本试探交错的前线局势",
     tone: "yuan",
+    cover: "/images/yuan-bg.png",
+    portrait: "/images/yuan-portrait.png",
+    coverPosition: "center 62%",
+    portraitPosition: "center top",
   },
   zhang_juzheng_reform: {
     crest: "张",
     label: "明廷改革",
     description: "紫禁城秩序深处，改革与权力节奏相互牵动",
     tone: "zhang",
+    cover: "/images/zhang-bg.png",
+    portrait: "/images/zhang-portrait.png",
+    coverPosition: "center 74%",
+    portraitPosition: "center top",
   },
   li_quan_red_turban: {
     crest: "李",
     label: "乱世扩张",
     description: "山东与淮海之间，流民、粮道与军势同时翻涌",
     tone: "li",
+    cover: "/images/li-bg.png",
+    portrait: "/images/li-portrait.png",
+    coverPosition: "center 68%",
+    portraitPosition: "center top",
   },
 };
 
@@ -72,6 +84,10 @@ function getScenarioDecor(scenarioId) {
       label: "历史剧本",
       description: "围绕关键节点展开的历史推演。",
       tone: "default",
+      cover: "",
+      portrait: "",
+      coverPosition: "center center",
+      portraitPosition: "center top",
     }
   );
 }
@@ -89,6 +105,7 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [draftAction, setDraftAction] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState(null);
+  const [selectedTurnIndex, setSelectedTurnIndex] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -117,6 +134,7 @@ export default function App() {
     setDraftAction("");
     setSelectedOptionId(null);
     setHistory([]);
+    setSelectedTurnIndex(null);
 
     try {
       const [seed, snapshot] = await Promise.all([
@@ -186,11 +204,13 @@ export default function App() {
       setSessionSnapshot((previous) => ({
         ...previous,
         session: result.session,
-        latest_narration: result.ending ?? result.turn.ai_narration,
+        latest_narration: result.turn.ai_narration,
         next_prompt_hint: result.next_prompt_hint,
         runtime_mode: result.runtime_mode,
+        ending: result.ending ?? null,
       }));
       setHistory((previous) => [...previous, result.turn]);
+      setSelectedTurnIndex(result.turn.turn_index);
       setDraftAction("");
       setSelectedOptionId(null);
     } catch (err) {
@@ -207,8 +227,11 @@ export default function App() {
 
   const currentDecor = getScenarioDecor(selectedScenarioId);
   const sessionEnded = sessionSnapshot?.session?.status === "ended";
+  const currentEnding = sessionSnapshot?.ending ?? null;
   const latestTurn = history.at(-1) ?? null;
-  const previousTurns = history.slice(0, -1).reverse();
+  const activeTurn =
+    history.find((entry) => entry.turn_index === selectedTurnIndex) ?? latestTurn ?? null;
+  const isViewingLatest = activeTurn?.turn_index === latestTurn?.turn_index;
 
   return (
     <div className={`app-shell ${page === "home" ? "shell-home" : "shell-detail"}`}>
@@ -229,8 +252,8 @@ export default function App() {
             </div>
 
             <p className="eyebrow">AI 中国古代历史情景推演系统</p>
-            <h1 className="home-title">历史岔路</h1>
-            <p className="home-tagline">选择你的时代，改写一段历史</p>
+            <h1 className="home-title">身在局中</h1>
+            <p className="home-tagline">置身时代局势之中，做出你的抉择</p>
             <p className="home-summary">
               在关键的历史节点，你将扮演特定的角色，面对复杂的局势与抉择。每一次选择，
               都可能改变历史的走向。
@@ -260,7 +283,17 @@ export default function App() {
                         key={item.id}
                         className={`scenario-home-card tone-${decor.tone}`}
                       >
-                        <div className="scenario-home-art">
+                        <div
+                          className="scenario-home-art"
+                          style={
+                            decor.cover
+                              ? {
+                                  backgroundImage: `url(${decor.cover})`,
+                                  backgroundPosition: decor.coverPosition,
+                                }
+                              : undefined
+                          }
+                        >
                           <span className="scenario-home-seal">{decor.crest}</span>
                         </div>
 
@@ -287,7 +320,7 @@ export default function App() {
 
             <footer className="home-footer">
               <span>选择一个历史剧本，进入你的时代，书写属于你的历史。</span>
-              <span>历史岔路 v1.0.0</span>
+              <span>身在局中 v1.0.0</span>
             </footer>
           </main>
         </>
@@ -317,6 +350,16 @@ export default function App() {
             ) : scenarioSeed && sessionSnapshot ? (
               <>
                 <section className={`detail-hero tone-${currentDecor.tone}`}>
+                  {currentDecor.cover ? (
+                    <div
+                      className="detail-hero-backdrop"
+                      style={{
+                        backgroundImage: `url(${currentDecor.cover})`,
+                        backgroundPosition: currentDecor.coverPosition,
+                      }}
+                    />
+                  ) : null}
+
                   <div className="detail-hero-copy">
                     <p className="eyebrow">当前剧本</p>
                     <div className="detail-hero-title-row">
@@ -329,7 +372,18 @@ export default function App() {
                   </div>
 
                   <div className="detail-hero-side">
-                    <div className="detail-hero-badge">{currentDecor.crest}</div>
+                    {currentDecor.portrait ? (
+                      <div className="detail-portrait-frame">
+                        <img
+                          className="detail-portrait-image"
+                          src={currentDecor.portrait}
+                          alt={`${scenarioSeed.player_role}立绘`}
+                          style={{ objectPosition: currentDecor.portraitPosition }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="detail-hero-badge">{currentDecor.crest}</div>
+                    )}
                     <p>{currentDecor.description}</p>
                     <span className="session-pill">
                       {sessionEnded
@@ -515,19 +569,35 @@ export default function App() {
                 <section className="result-panel">
                   <div className="panel-head result-head">
                     <div>
-                      <span className="panel-kicker">最新推演结果</span>
-                      <h2>本轮战报总览</h2>
+                      <span className="panel-kicker">
+                        {isViewingLatest ? "最新推演结果" : "历史回合战报"}
+                      </span>
+                      <h2>{activeTurn ? `第 ${activeTurn.turn_index} 回合战报总览` : "本轮战报总览"}</h2>
                     </div>
                     <span className="result-time">
-                      推演时间：{formatTimestamp(latestTurn?.timestamp)}
+                      {activeTurn
+                        ? `${isViewingLatest ? "最新回合" : "当前选中"} · ${formatTimestamp(activeTurn.timestamp)}`
+                        : "等待首个回合"}
                     </span>
                   </div>
 
-                  {latestTurn ? (
+                  {sessionEnded && currentEnding ? (
+                    <article className="ending-card">
+                      <div className="ending-head">
+                        <span className="ending-kicker">阶段性结局</span>
+                        <span className="ending-turns">
+                          本局已走完 {sessionSnapshot.session.turn_index} / 10 回合
+                        </span>
+                      </div>
+                      <p>{currentEnding}</p>
+                    </article>
+                  ) : null}
+
+                  {activeTurn ? (
                     <article className="latest-turn">
                       <div className="latest-turn-index">
                         <span>第</span>
-                        <strong>{String(latestTurn.turn_index).padStart(2, "0")}</strong>
+                        <strong>{String(activeTurn.turn_index).padStart(2, "0")}</strong>
                         <span>回合</span>
                       </div>
 
@@ -535,27 +605,27 @@ export default function App() {
                         <div className="latest-grid">
                           <div className="latest-cell">
                             <h3>回合编号</h3>
-                            <p>第 {latestTurn.turn_index} 回合</p>
+                            <p>第 {activeTurn.turn_index} 回合</p>
                           </div>
                           <div className="latest-cell">
                             <h3>玩家决策</h3>
-                            <p>{latestTurn.player_action}</p>
+                            <p>{activeTurn.player_action}</p>
                           </div>
                           <div className="latest-cell">
                             <h3>系统裁定模式</h3>
-                            <p>{formatRuntimeMode(latestTurn.resolution_mode)}</p>
+                            <p>{formatRuntimeMode(activeTurn.resolution_mode)}</p>
                           </div>
                           <div className="latest-cell">
                             <h3>结果摘要</h3>
-                            <p>{latestTurn.outcome_summary}</p>
+                            <p>{activeTurn.outcome_summary}</p>
                           </div>
                           <div className="latest-cell latest-wide">
                             <h3>世界变化</h3>
-                            <p>{latestTurn.world_update}</p>
+                            <p>{activeTurn.world_update}</p>
                           </div>
                           <div className="latest-cell latest-wide accent-cell">
                             <h3>推演结果</h3>
-                            <p>{latestTurn.ai_narration}</p>
+                            <p>{activeTurn.ai_narration}</p>
                           </div>
                         </div>
                       </div>
@@ -583,40 +653,51 @@ export default function App() {
 
                 <section className="history-panel">
                   <div className="panel-head">
-                    <span className="panel-kicker">历史回合记录</span>
+                    <span className="panel-kicker">历史推演轨迹</span>
                     <span className="session-meta">
                       {history.length === 0 ? "尚无历史回合" : `累计 ${history.length} 条记录`}
                     </span>
                   </div>
 
-                  <div className="timeline-list">
+                  <div className="history-summary">
+                    <p>点击下方时间轴节点，即可在上方战报区查看对应回合的完整记录。</p>
+                    {activeTurn ? (
+                      <span className="history-active-badge">
+                        当前查看：第 {String(activeTurn.turn_index).padStart(2, "0")} 回合
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="timeline-rail">
                     {history.length === 0 ? (
-                      <div className="timeline-item empty">
+                      <div className="timeline-empty">
                         当前还没有提交任何回合。
                       </div>
                     ) : (
-                      <>
-                        {previousTurns.map((entry) => (
-                          <div className="timeline-item" key={entry.turn_index}>
-                            <span>{String(entry.turn_index).padStart(2, "0")}</span>
-                            <strong>{entry.player_action}</strong>
-                            <small className="timeline-mode">
-                              {formatRuntimeMode(entry.resolution_mode)}
-                            </small>
-                            <p>{entry.outcome_summary}</p>
-                            <em>{entry.world_update}</em>
-                          </div>
-                        ))}
-                        <div className="timeline-item latest">
-                          <span>{String(latestTurn.turn_index).padStart(2, "0")}</span>
-                          <strong>{latestTurn.player_action}</strong>
-                          <small className="timeline-mode">
-                            {formatRuntimeMode(latestTurn.resolution_mode)}
-                          </small>
-                          <p>{latestTurn.outcome_summary}</p>
-                          <em>{latestTurn.world_update}</em>
+                      <div className="timeline-scroll">
+                        <div className="timeline-track" aria-label="历史回合时间轴">
+                          {history.map((entry) => {
+                            const isActive = entry.turn_index === activeTurn?.turn_index;
+                            const isLatest = entry.turn_index === latestTurn?.turn_index;
+                            return (
+                              <button
+                                key={entry.turn_index}
+                                className={`timeline-node ${isActive ? "active" : ""}`}
+                                onClick={() => setSelectedTurnIndex(entry.turn_index)}
+                                type="button"
+                              >
+                                <span className="timeline-node-dot" />
+                                <span className="timeline-node-index">
+                                  第 {String(entry.turn_index).padStart(2, "0")} 回
+                                </span>
+                                <strong>{entry.player_action}</strong>
+                                <small>{entry.outcome_summary}</small>
+                                <em>{isLatest ? "最新回合" : formatRuntimeMode(entry.resolution_mode)}</em>
+                              </button>
+                            );
+                          })}
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 </section>
