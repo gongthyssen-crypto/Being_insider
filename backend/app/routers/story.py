@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import UTC, datetime
 
@@ -16,6 +17,7 @@ from app.schemas import (
     ScenarioSeed,
     SessionSnapshot,
     SessionState,
+    StageEnding,
     TurnLog,
     TurnResult,
     WorldSummary,
@@ -29,6 +31,8 @@ from app.session_store import (
 )
 
 router = APIRouter(prefix="/api", tags=["story"])
+logger = logging.getLogger(__name__)
+MIN_END_TURNS = 7
 MAX_TURNS = 10
 
 
@@ -46,6 +50,9 @@ def _bundle_to_snapshot(bundle: dict) -> SessionSnapshot:
         next_prompt_hint=bundle["next_prompt_hint"],
         runtime_mode=bundle["runtime_mode"],
         ending=bundle.get("ending"),
+        ending_summary=StageEnding(**bundle["ending_summary"])
+        if bundle.get("ending_summary")
+        else None,
     )
 
 
@@ -114,6 +121,33 @@ def _build_stage_ending(
     )
 
 
+def _build_stage_ending_summary(
+    seed: ScenarioSeed,
+    action_summary: str,
+    action_mode: str,
+    outcome_summary: str,
+) -> StageEnding:
+    appraisal_map = {
+        "强压": "你这一局打出了明显先手，局面被你强行拉进了你的节奏，但代价也开始累积。",
+        "缓和": "你这一局更像是在稳盘，虽然没有立刻翻盘，但成功把局势从失控边缘往回拽了一步。",
+        "借势": "你这一局擅长借势而行，放大了制度与盟友的价值，但也让后续依赖更重。",
+        "观望": "你这一局以谨慎换取判断空间，风险没有彻底解除，但至少避免了过早失手。",
+        "调度": "你这一局偏向务实推进，没有一击定局，却逐步把局势推向了更可控的位置。",
+        "推进": "你这一局形成了持续推进的路线，局势虽然未定，但主动权已开始向你倾斜。",
+    }
+    return StageEnding(
+        title="阶段性结局",
+        appraisal=appraisal_map.get(
+            action_mode,
+            "你这一局已经形成了较清晰的路径，虽然仍有代价，但整体走势开始向你倾斜。",
+        ),
+        route=f"本局围绕“{action_summary}”展开，逐步形成了以{action_mode}为主的推进路线。",
+        achievement=f"你已经把局势暂时推向更有利的一侧。{outcome_summary}",
+        risk=f"当前仍未化解的核心隐患是：{seed.failure_risk}",
+        outlook="如果继续沿着这条路线推进，历史很可能进入更强控制与更高张力并存的下一阶段。",
+    )
+
+
 def _build_turn_result(
     session: SessionState,
     seed: ScenarioSeed,
@@ -134,10 +168,17 @@ def _build_turn_result(
         "下一轮可以继续写你如何巩固这一决定、修补副作用，或者转向处理新的风险点。"
     )
     ending = None
+    ending_summary = None
     status = "active"
 
     if new_turn_index >= MAX_TURNS:
         status = "ended"
+        ending_summary = _build_stage_ending_summary(
+            seed=seed,
+            action_summary=action_summary,
+            action_mode=action_mode,
+            outcome_summary=outcome_summary,
+        )
         ending = _build_stage_ending(
             seed=seed,
             action_summary=action_summary,
@@ -185,6 +226,7 @@ def _build_turn_result(
         next_prompt_hint=next_prompt_hint,
         runtime_mode=runtime_mode,
         ending=ending,
+        ending_summary=ending_summary,
     )
 
 
@@ -197,13 +239,26 @@ def _build_turn_result_from_resolution(
 ) -> TurnResult:
     new_turn_index = session.turn_index + 1
     action_summary = _summarize_action(action_text)
+    outcome_summary = resolution.get("outcome_summary") or (
+        "这一决策已经改变了局势平衡，但新的后果仍在继续显现。"
+    )
     ending = resolution.get("ending")
+    ending_summary = None
     status = "active"
     next_prompt_hint = resolution.get("next_prompt_hint") or (
         "下一轮继续描述你的行动，说明你准备如何扩大优势或处理新的风险。"
     )
 
+    if new_turn_index < MIN_END_TURNS:
+        ending = None
+
     if new_turn_index >= MAX_TURNS and not ending:
+        ending_summary = _build_stage_ending_summary(
+            seed=seed,
+            action_summary=action_summary,
+            action_mode="推进",
+            outcome_summary=outcome_summary,
+        )
         ending = _build_stage_ending(
             seed=seed,
             action_summary=action_summary,
@@ -213,12 +268,15 @@ def _build_turn_result_from_resolution(
 
     if ending:
         status = "ended"
+        ending_summary = ending_summary or _build_stage_ending_summary(
+            seed=seed,
+            action_summary=action_summary,
+            action_mode="推进",
+            outcome_summary=outcome_summary,
+        )
 
     ai_narration = resolution.get("ai_narration") or (
         f"你本轮选择先{action_summary}，局势随即出现新的震动。"
-    )
-    outcome_summary = resolution.get("outcome_summary") or (
-        "这一决策已经改变了局势平衡，但新的后果仍在继续显现。"
     )
     world_update = resolution.get("world_update") or outcome_summary
 
@@ -261,6 +319,7 @@ def _build_turn_result_from_resolution(
         next_prompt_hint=next_prompt_hint,
         runtime_mode=runtime_mode,
         ending=ending,
+        ending_summary=ending_summary,
     )
 
 
@@ -346,7 +405,15 @@ def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
         resolution = request_turn_resolution(seed, session, history, action_text)
         if resolution is not None:
             runtime_mode = current_model_mode()
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning(
+            "DeepSeek resolution failed for session=%s turn=%s scenario=%s: %s",
+            session.session_id,
+            session.turn_index + 1,
+            session.scenario_id,
+            exc,
+        )
+        runtime_mode = f"local-fallback:{exc.__class__.__name__}"
         resolution = None
     if resolution is None:
         result = _build_turn_result(session, seed, action_text, runtime_mode=runtime_mode)
@@ -366,5 +433,6 @@ def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
         result.next_prompt_hint,
         result.runtime_mode,
         result.ending,
+        result.ending_summary.model_dump() if result.ending_summary else None,
     )
     return result

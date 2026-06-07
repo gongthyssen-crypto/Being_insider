@@ -52,6 +52,15 @@ class SessionState(BaseModel):
     world_summary: WorldSummary
 
 
+class StageEnding(BaseModel):
+    title: str
+    appraisal: str
+    route: str
+    achievement: str
+    risk: str
+    outlook: str
+
+
 class SessionSnapshot(BaseModel):
     session: SessionState
     scenario_seed: ScenarioSeed
@@ -59,6 +68,7 @@ class SessionSnapshot(BaseModel):
     next_prompt_hint: str
     runtime_mode: str
     ending: str | None = None
+    ending_summary: StageEnding | None = None
 
 
 class CreateSessionRequest(BaseModel):
@@ -86,6 +96,7 @@ class TurnResult(BaseModel):
     next_prompt_hint: str
     runtime_mode: str
     ending: str | None = None
+    ending_summary: StageEnding | None = None
 
 
 class HealthPayload(BaseModel):
