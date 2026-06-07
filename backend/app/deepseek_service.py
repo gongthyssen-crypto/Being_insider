@@ -8,16 +8,13 @@ import httpx
 
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
-DEEPSEEK_API_KEY = os.getenv(
-    "DEEPSEEK_API_KEY",
-    "sk-eaf1fd07c13141a0be6ea6f50a996663"
-)
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
 
 def is_deepseek_configured() -> bool:
-    return bool(DEEPSEEK_API_KEY) and DEEPSEEK_API_KEY != "REPLACE_WITH_YOUR_REAL_DEEPSEEK_API_KEY"
+    return bool(DEEPSEEK_API_KEY)
 
 
 def current_model_mode() -> str:
