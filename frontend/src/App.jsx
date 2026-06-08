@@ -296,6 +296,7 @@ export default function App() {
         session: result.session,
         latest_narration: result.turn.ai_narration,
         next_prompt_hint: result.next_prompt_hint,
+        suggested_options: result.suggested_options,
         runtime_mode: result.runtime_mode,
         ending: result.ending ?? null,
         ending_summary: result.ending_summary ?? null,
@@ -701,8 +702,8 @@ export default function App() {
                         ) : (
                           <div className="guide-scroll">
                             <div className="subsection-head">
-                              <h3>推荐起手</h3>
-                              <p>{scenarioSeed.opening_prompt_hint}</p>
+                              <h3>本轮建议行动</h3>
+                              <p>{sessionSnapshot.next_prompt_hint}</p>
                             </div>
 
                             <div className="guide-concepts">
@@ -714,7 +715,7 @@ export default function App() {
                             </div>
 
                             <div className="opening-option-list">
-                              {scenarioSeed.initial_options.map((option) => (
+                              {(sessionSnapshot.suggested_options ?? scenarioSeed.initial_options).map((option) => (
                                 <button
                                   key={option.id}
                                   className={`opening-option ${
@@ -740,7 +741,7 @@ export default function App() {
                         <h3>你的决策</h3>
                         <p>
                           {selectedOptionId
-                            ? `已绑定参考起手：${selectedOptionId}`
+                            ? `已绑定本轮建议：${selectedOptionId}`
                             : "可直接输入自由行动"}
                         </p>
                       </div>

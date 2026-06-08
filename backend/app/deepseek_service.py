@@ -6,12 +6,10 @@ from typing import Any
 
 import httpx
 
+from app.knowledge_base import build_turn_knowledge_briefing
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
-DEEPSEEK_API_KEY = os.getenv(
-    "DEEPSEEK_API_KEY",
-    "sk-eaf1fd07c13141a0be6ea6f50a996663"
-)
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-2a1d86caf93d4c21ba51be6c69bc7abd")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
@@ -49,6 +47,14 @@ Requirements:
   "outcome_summary": "string",
   "world_update": "string",
   "next_prompt_hint": "string",
+  "suggested_options": [
+    {{
+      "id": "snake_case_id",
+      "label": "string",
+      "brief": "string",
+      "strategic_hint": "string"
+    }}
+  ],
   "ending": null
 }}
 6. Never quote, copy, or closely paraphrase the player's action verbatim. Summarize the action in your own words before judging consequences.
@@ -60,6 +66,8 @@ Requirements:
    - what direction the situation is likely to move next.
    Otherwise use null.
 10. By turn 10, the scenario must be allowed to conclude if the strategic arc has matured.
+11. Always provide exactly 3 suggested_options for the player's next turn.
+12. Make the 3 suggested_options meaningfully different from each other and responsive to the latest situation.
 """.strip()
 
 
@@ -81,6 +89,7 @@ def _history_messages(history: list[TurnLog]) -> list[dict[str, str]]:
                         "outcome_summary": turn.outcome_summary,
                         "world_update": turn.world_update,
                         "next_prompt_hint": "Recorded historical turn",
+                        "suggested_options": [],
                         "ending": None,
                     },
                     ensure_ascii=False,
@@ -96,6 +105,16 @@ def build_messages(
     history: list[TurnLog],
     action_text: str,
 ) -> list[dict[str, str]]:
+    knowledge_briefing = build_turn_knowledge_briefing(
+        seed=seed,
+        session=session,
+        history=history,
+        action_text=action_text,
+    )
+    knowledge_block = ""
+    if knowledge_briefing:
+        knowledge_block = f"{knowledge_briefing}\n\n"
+
     messages: list[dict[str, str]] = [{"role": "system", "content": _system_prompt(seed)}]
     messages.extend(_history_messages(history))
     messages.append(
@@ -108,6 +127,7 @@ def build_messages(
                 f"- situation: {session.world_summary.situation}\n"
                 f"- pressure_points: {'; '.join(session.world_summary.pressure_points)}\n"
                 f"- recent_shift: {session.world_summary.recent_shift}\n\n"
+                f"{knowledge_block}"
                 f"- current_turn: {session.turn_index + 1}\n\n"
                 f"Current player action:\n{action_text}\n\n"
                 f"Do not quote or repeat the current player action verbatim. Summarize it in your own words.\n"
@@ -158,5 +178,6 @@ def request_turn_resolution(
         "outcome_summary": str(parsed.get("outcome_summary", "")).strip(),
         "world_update": str(parsed.get("world_update", "")).strip(),
         "next_prompt_hint": str(parsed.get("next_prompt_hint", "")).strip(),
+        "suggested_options": parsed.get("suggested_options"),
         "ending": parsed.get("ending"),
     }

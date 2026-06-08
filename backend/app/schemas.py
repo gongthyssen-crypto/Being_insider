@@ -66,6 +66,7 @@ class SessionSnapshot(BaseModel):
     scenario_seed: ScenarioSeed
     latest_narration: str
     next_prompt_hint: str
+    suggested_options: list[OpeningOption]
     runtime_mode: str
     ending: str | None = None
     ending_summary: StageEnding | None = None
@@ -94,6 +95,7 @@ class TurnResult(BaseModel):
     session: SessionState
     turn: TurnLog
     next_prompt_hint: str
+    suggested_options: list[OpeningOption]
     runtime_mode: str
     ending: str | None = None
     ending_summary: StageEnding | None = None

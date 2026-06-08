@@ -12,6 +12,7 @@ from app.deepseek_service import current_model_mode, request_turn_resolution
 from app.schemas import (
     CreateSessionRequest,
     HealthPayload,
+    OpeningOption,
     PlayerTurnRequest,
     ScenarioCard,
     ScenarioSeed,
@@ -48,12 +49,145 @@ def _bundle_to_snapshot(bundle: dict) -> SessionSnapshot:
         scenario_seed=seed,
         latest_narration=bundle["latest_narration"],
         next_prompt_hint=bundle["next_prompt_hint"],
+        suggested_options=[
+            OpeningOption(**item)
+            for item in bundle.get("suggested_options", [option.model_dump() for option in seed.initial_options])
+        ],
         runtime_mode=bundle["runtime_mode"],
         ending=bundle.get("ending"),
         ending_summary=StageEnding(**bundle["ending_summary"])
         if bundle.get("ending_summary")
         else None,
     )
+
+
+def _slugify_option_id(label: str, turn_index: int, slot_index: int) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    if not normalized:
+        normalized = f"option_{turn_index}_{slot_index}"
+    return f"{normalized[:24]}_{turn_index}_{slot_index}"
+
+
+def _shorten_text(text: str, limit: int = 28) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[:limit].rstrip(' ,;，。')}..."
+
+
+def _build_dynamic_options(
+    seed: ScenarioSeed,
+    session: SessionState,
+    *,
+    action_summary: str = "",
+    outcome_summary: str = "",
+    turn_index: int | None = None,
+    ended: bool = False,
+) -> list[OpeningOption]:
+    next_turn_index = turn_index or (session.turn_index + 1)
+    recent_focus = _shorten_text(
+        outcome_summary or session.world_summary.recent_shift or seed.opening_situation
+    )
+    main_pressure = _shorten_text(seed.failure_risk)
+    pivot_seed = seed.initial_options[(next_turn_index - 1) % len(seed.initial_options)]
+
+    if ended:
+        raw_options = [
+            (
+                "复盘本局路径",
+                "回头梳理本局关键节点，判断哪一步真正改变了局势走向。",
+                "适合沉淀这局的策略逻辑，再决定是否重开。",
+            ),
+            (
+                "从另一方向重开",
+                f"下次可尝试把“{pivot_seed.label}”作为新的起手路线。",
+                "适合测试同一场景的另一条策略轴线。",
+            ),
+            (
+                "对照真实历史",
+                "回看知识库中的真实历史对照材料，比较你的路线与史实偏差。",
+                "适合做复盘总结，而不是继续推进当前会话。",
+            ),
+        ]
+    else:
+        raw_options = [
+            (
+                "稳住当前推进",
+                f"围绕“{recent_focus}”继续加固现有成果，先别让主动权重新滑走。",
+                "偏向巩固成果，降低已经显露的波动。",
+            ),
+            (
+                "先压暴露风险",
+                f"优先处理“{main_pressure}”代表的隐患，避免下一轮被对手借势反扑。",
+                "偏向补漏洞，适合局势副作用开始显性化时使用。",
+            ),
+            (
+                f"转向{pivot_seed.label}",
+                f"在当前局势基础上，改为推动“{pivot_seed.brief}”，开辟新的推进方向。",
+                pivot_seed.strategic_hint,
+            ),
+        ]
+
+    options: list[OpeningOption] = []
+    for slot_index, (label, brief, strategic_hint) in enumerate(raw_options, start=1):
+        options.append(
+            OpeningOption(
+                id=_slugify_option_id(label, next_turn_index, slot_index),
+                label=label,
+                brief=brief,
+                strategic_hint=strategic_hint,
+            )
+        )
+    return options
+
+
+def _coerce_suggested_options(
+    raw_options: object,
+    seed: ScenarioSeed,
+    session: SessionState,
+    *,
+    action_summary: str = "",
+    outcome_summary: str = "",
+    turn_index: int | None = None,
+    ended: bool = False,
+) -> list[OpeningOption]:
+    fallback_options = _build_dynamic_options(
+        seed,
+        session,
+        action_summary=action_summary,
+        outcome_summary=outcome_summary,
+        turn_index=turn_index,
+        ended=ended,
+    )
+    if not isinstance(raw_options, list):
+        return fallback_options
+
+    parsed: list[OpeningOption] = []
+    for slot_index, item in enumerate(raw_options[:3], start=1):
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label", "")).strip()
+        brief = str(item.get("brief", "")).strip()
+        strategic_hint = str(item.get("strategic_hint", "")).strip()
+        if not label or not brief or not strategic_hint:
+            continue
+        option_id = str(item.get("id", "")).strip() or _slugify_option_id(
+            label,
+            turn_index or (session.turn_index + 1),
+            slot_index,
+        )
+        parsed.append(
+            OpeningOption(
+                id=option_id,
+                label=label,
+                brief=brief,
+                strategic_hint=strategic_hint,
+            )
+        )
+
+    if len(parsed) != 3:
+        return fallback_options
+    return parsed
 
 
 def _classify_action(action_text: str) -> tuple[str, str]:
@@ -211,6 +345,14 @@ def _build_turn_result(
         updated_at=now,
         world_summary=updated_world,
     )
+    suggested_options = _build_dynamic_options(
+        seed,
+        updated_session,
+        action_summary=action_summary,
+        outcome_summary=outcome_summary,
+        turn_index=new_turn_index + (0 if status == "ended" else 1),
+        ended=status == "ended",
+    )
     turn_log = TurnLog(
         turn_index=new_turn_index,
         player_action=action_text,
@@ -224,6 +366,7 @@ def _build_turn_result(
         session=updated_session,
         turn=turn_log,
         next_prompt_hint=next_prompt_hint,
+        suggested_options=suggested_options,
         runtime_mode=runtime_mode,
         ending=ending,
         ending_summary=ending_summary,
@@ -304,6 +447,15 @@ def _build_turn_result_from_resolution(
         updated_at=now,
         world_summary=updated_world,
     )
+    suggested_options = _coerce_suggested_options(
+        resolution.get("suggested_options"),
+        seed,
+        updated_session,
+        action_summary=action_summary,
+        outcome_summary=outcome_summary,
+        turn_index=new_turn_index + (0 if status == "ended" else 1),
+        ended=status == "ended",
+    )
     turn_log = TurnLog(
         turn_index=new_turn_index,
         player_action=action_text,
@@ -317,6 +469,7 @@ def _build_turn_result_from_resolution(
         session=updated_session,
         turn=turn_log,
         next_prompt_hint=next_prompt_hint,
+        suggested_options=suggested_options,
         runtime_mode=runtime_mode,
         ending=ending,
         ending_summary=ending_summary,
@@ -374,7 +527,8 @@ def session_history(session_id: str) -> list[TurnLog]:
 @router.post("/sessions/{session_id}/turns", response_model=TurnResult)
 def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
     try:
-        session = get_session_state(session_id)
+        bundle = get_session_bundle(session_id)
+        session = SessionState(**bundle["session"])
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
 
@@ -390,13 +544,17 @@ def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
     if not action_text:
         raise HTTPException(status_code=400, detail="Action text cannot be empty")
 
+    current_options = [
+        OpeningOption(**item)
+        for item in bundle.get("suggested_options", [option.model_dump() for option in seed.initial_options])
+    ]
     if payload.source_option_id:
         matched = next(
-            (item for item in seed.initial_options if item.id == payload.source_option_id),
+            (item for item in current_options if item.id == payload.source_option_id),
             None,
         )
         if matched is None:
-            raise HTTPException(status_code=400, detail="Opening option not valid")
+            raise HTTPException(status_code=400, detail="Suggested option not valid")
         action_text = f"{matched.label}：{action_text}"
 
     history = get_turn_history(session_id)
@@ -431,6 +589,7 @@ def submit_turn(session_id: str, payload: PlayerTurnRequest) -> TurnResult:
         result.turn,
         result.turn.ai_narration,
         result.next_prompt_hint,
+        [option.model_dump() for option in result.suggested_options],
         result.runtime_mode,
         result.ending,
         result.ending_summary.model_dump() if result.ending_summary else None,

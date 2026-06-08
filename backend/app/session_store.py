@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from app.content import get_scenario_seed
 from app.deepseek_service import current_model_mode
-from app.schemas import SessionState, TurnLog, WorldSummary
+from app.schemas import OpeningOption, SessionState, TurnLog, WorldSummary
 
 
 SESSIONS: dict[str, dict] = {}
@@ -44,6 +44,9 @@ def create_session(scenario_id: str) -> dict:
         "history": [],
         "latest_narration": seed["opening_situation"],
         "next_prompt_hint": seed["opening_prompt_hint"],
+        "suggested_options": [
+            OpeningOption(**item).model_dump() for item in seed["initial_options"]
+        ],
         "runtime_mode": current_model_mode(),
         "ending": None,
         "ending_summary": None,
@@ -74,6 +77,7 @@ def save_turn_result(
     turn_log: TurnLog,
     latest_narration: str,
     next_prompt_hint: str,
+    suggested_options: list[dict],
     runtime_mode: str,
     ending: str | None = None,
     ending_summary: dict | None = None,
@@ -85,6 +89,7 @@ def save_turn_result(
     bundle["history"].append(turn_log.model_dump())
     bundle["latest_narration"] = latest_narration
     bundle["next_prompt_hint"] = next_prompt_hint
+    bundle["suggested_options"] = suggested_options
     bundle["runtime_mode"] = runtime_mode
     bundle["ending"] = ending
     bundle["ending_summary"] = ending_summary
