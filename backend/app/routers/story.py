@@ -10,11 +10,14 @@ from fastapi import APIRouter, HTTPException
 from app.content import get_scenario_seed, list_scenarios
 from app.deepseek_service import current_model_mode, request_turn_resolution
 from app.knowledge_base import current_knowledge_retrieval_mode
+from app.runtime_settings import get_runtime_settings, update_runtime_settings
 from app.schemas import (
     CreateSessionRequest,
     HealthPayload,
     OpeningOption,
     PlayerTurnRequest,
+    RuntimeSettings,
+    RuntimeSettingsUpdate,
     ScenarioCard,
     ScenarioSeed,
     SessionSnapshot,
@@ -485,6 +488,16 @@ def health() -> HealthPayload:
         model_mode=current_model_mode(),
         knowledge_mode=current_knowledge_retrieval_mode(),
     )
+
+
+@router.get("/runtime-settings", response_model=RuntimeSettings)
+def runtime_settings() -> RuntimeSettings:
+    return get_runtime_settings()
+
+
+@router.put("/runtime-settings", response_model=RuntimeSettings)
+def save_runtime_settings(payload: RuntimeSettingsUpdate) -> RuntimeSettings:
+    return update_runtime_settings(payload)
 
 
 @router.get("/scenarios", response_model=list[ScenarioCard])

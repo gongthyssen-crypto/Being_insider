@@ -10,6 +10,7 @@ import re
 
 import httpx
 
+from app.runtime_settings import get_runtime_settings
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
 logger = logging.getLogger(__name__)
@@ -503,6 +504,7 @@ def build_turn_knowledge_briefing(
     history: list[TurnLog],
     action_text: str,
 ) -> str:
+    runtime_settings = get_runtime_settings()
     query_parts = [
         seed.title,
         seed.player_role,
@@ -523,7 +525,12 @@ def build_turn_knowledge_briefing(
             ]
         )
 
-    matches = retrieve_knowledge_matches(seed.id, "\n".join(query_parts))
+    matches = retrieve_knowledge_matches(
+        seed.id,
+        "\n".join(query_parts),
+        max_matches=runtime_settings.turn_knowledge_max_matches,
+        max_excerpt_chars=runtime_settings.turn_knowledge_max_excerpt_chars,
+    )
     if not matches:
         return ""
 

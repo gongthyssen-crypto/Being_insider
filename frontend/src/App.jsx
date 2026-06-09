@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 const API_ROOT = "/api";
+const DEFAULT_RUNTIME_SETTINGS = {
+  deepseek_max_tokens: 4096,
+  deepseek_thinking_enabled: true,
+  turn_knowledge_max_matches: 4,
+  turn_knowledge_max_excerpt_chars: 720,
+};
 
 const SCENARIO_DECOR = {
   yuan_shikai_korea: {
@@ -188,6 +194,9 @@ export default function App() {
   const [sessionSnapshot, setSessionSnapshot] = useState(null);
   const [history, setHistory] = useState([]);
   const [health, setHealth] = useState(null);
+  const [runtimeSettings, setRuntimeSettings] = useState(DEFAULT_RUNTIME_SETTINGS);
+  const [settingsDraft, setSettingsDraft] = useState(DEFAULT_RUNTIME_SETTINGS);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -200,12 +209,15 @@ export default function App() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        const [scenarioData, healthData] = await Promise.all([
+        const [scenarioData, healthData, runtimeSettingsData] = await Promise.all([
           readJson("/scenarios"),
           readJson("/health"),
+          readJson("/runtime-settings"),
         ]);
         setScenarios(scenarioData);
         setHealth(healthData);
+        setRuntimeSettings(runtimeSettingsData);
+        setSettingsDraft(runtimeSettingsData);
       } catch (err) {
         setError("后端未启动，或依赖尚未安装。");
       } finally {
@@ -261,6 +273,38 @@ export default function App() {
     setSelectedOptionId(option.id);
     setDraftAction(option.brief);
     setError("");
+  }
+
+  function updateSettingsField(field, value) {
+    setSettingsDraft((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  }
+
+  async function saveRuntimeSettings() {
+    setSettingsSaving(true);
+    setError("");
+
+    try {
+      const payload = {
+        deepseek_max_tokens: Number(settingsDraft.deepseek_max_tokens),
+        deepseek_thinking_enabled: Boolean(settingsDraft.deepseek_thinking_enabled),
+        turn_knowledge_max_matches: Number(settingsDraft.turn_knowledge_max_matches),
+        turn_knowledge_max_excerpt_chars: Number(settingsDraft.turn_knowledge_max_excerpt_chars),
+      };
+      const saved = await readJson("/runtime-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setRuntimeSettings(saved);
+      setSettingsDraft(saved);
+    } catch (err) {
+      setError("Runtime settings save failed.");
+    } finally {
+      setSettingsSaving(false);
+    }
   }
 
   async function submitTurn() {
@@ -357,6 +401,97 @@ export default function App() {
           {error ? <section className="home-message error">{error}</section> : null}
 
           <main className="home-main">
+            <section className="runtime-settings-panel">
+              <div className="panel-head">
+                <span className="panel-kicker">Runtime Settings</span>
+                <span className="session-meta">Applies on the next turn without restart</span>
+              </div>
+
+              <div className="runtime-settings-grid">
+                <label className="runtime-field">
+                  <span>DeepSeek max tokens</span>
+                  <input
+                    type="number"
+                    min="512"
+                    max="8192"
+                    value={settingsDraft.deepseek_max_tokens}
+                    onChange={(event) =>
+                      updateSettingsField("deepseek_max_tokens", event.target.value)
+                    }
+                  />
+                  <small>Suggested: 4096-8192. Higher means more cost and latency.</small>
+                </label>
+
+                <label className="runtime-field">
+                  <span>RAG reference count</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="8"
+                    value={settingsDraft.turn_knowledge_max_matches}
+                    onChange={(event) =>
+                      updateSettingsField("turn_knowledge_max_matches", event.target.value)
+                    }
+                  />
+                  <small>More references improve coverage, but also lengthen the prompt.</small>
+                </label>
+
+                <label className="runtime-field">
+                  <span>Excerpt chars per reference</span>
+                  <input
+                    type="number"
+                    min="160"
+                    max="2400"
+                    value={settingsDraft.turn_knowledge_max_excerpt_chars}
+                    onChange={(event) =>
+                      updateSettingsField(
+                        "turn_knowledge_max_excerpt_chars",
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <small>Suggested: 480-1200. Too high increases truncation risk.</small>
+                </label>
+
+                <label className="runtime-field runtime-toggle">
+                  <span>Thinking mode</span>
+                  <button
+                    className={`toggle-button ${
+                      settingsDraft.deepseek_thinking_enabled ? "active" : ""
+                    }`}
+                    onClick={() =>
+                      updateSettingsField(
+                        "deepseek_thinking_enabled",
+                        !settingsDraft.deepseek_thinking_enabled,
+                      )
+                    }
+                    type="button"
+                  >
+                    {settingsDraft.deepseek_thinking_enabled ? "Enabled" : "Disabled"}
+                  </button>
+                  <small>
+                    Better reasoning quality, but it can consume output tokens and cause truncation.
+                  </small>
+                </label>
+              </div>
+
+              <div className="runtime-settings-actions">
+                <span className="hint-chip">
+                  {`Live: ${runtimeSettings.deepseek_max_tokens} tokens / RAG ${runtimeSettings.turn_knowledge_max_matches} / ${
+                    runtimeSettings.deepseek_thinking_enabled ? "thinking on" : "thinking off"
+                  }`}
+                </span>
+                <button
+                  className="primary-button"
+                  disabled={settingsSaving}
+                  onClick={saveRuntimeSettings}
+                  type="button"
+                >
+                  {settingsSaving ? "Saving..." : "Save Runtime Settings"}
+                </button>
+              </div>
+            </section>
+
             <section className="home-card-grid">
               {loading
                 ? Array.from({ length: 3 }).map((_, index) => (

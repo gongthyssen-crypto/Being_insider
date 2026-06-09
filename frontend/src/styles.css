@@ -196,6 +196,79 @@ button {
   gap: 26px;
 }
 
+.runtime-settings-panel {
+  padding: 18px 20px;
+  border: 1px solid rgba(185, 139, 90, 0.28);
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(248, 241, 229, 0.96));
+  box-shadow: var(--shadow);
+}
+
+.runtime-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.runtime-field {
+  display: grid;
+  gap: 8px;
+  padding: 14px 15px;
+  border: 1px solid rgba(185, 139, 90, 0.18);
+  background: rgba(255, 251, 244, 0.72);
+  color: var(--ink-soft);
+}
+
+.runtime-field span {
+  color: #5d4028;
+  font-size: 0.96rem;
+}
+
+.runtime-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid rgba(185, 139, 90, 0.28);
+  background: rgba(255, 252, 247, 0.96);
+  color: var(--ink);
+}
+
+.runtime-field small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.runtime-toggle {
+  align-content: start;
+}
+
+.toggle-button {
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid rgba(185, 139, 90, 0.28);
+  background: rgba(255, 251, 244, 0.88);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.toggle-button.active {
+  border-color: rgba(143, 64, 43, 0.42);
+  background: rgba(248, 237, 221, 0.96);
+  color: #53311d;
+}
+
+.runtime-settings-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
 .home-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1337,6 +1410,7 @@ button {
 
 @media (max-width: 1240px) {
   .home-card-grid,
+  .runtime-settings-grid,
   .detail-info-grid,
   .summary-grid,
   .latest-grid,
@@ -1375,6 +1449,7 @@ button {
 
 @media (max-width: 840px) {
   .home-card-grid,
+  .runtime-settings-grid,
   .detail-info-grid,
   .summary-grid,
   .latest-grid,

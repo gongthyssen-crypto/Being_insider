@@ -106,3 +106,17 @@ class HealthPayload(BaseModel):
     api_name: str
     model_mode: str
     knowledge_mode: str
+
+
+class RuntimeSettings(BaseModel):
+    deepseek_max_tokens: int
+    deepseek_thinking_enabled: bool
+    turn_knowledge_max_matches: int
+    turn_knowledge_max_excerpt_chars: int
+
+
+class RuntimeSettingsUpdate(BaseModel):
+    deepseek_max_tokens: int | None = None
+    deepseek_thinking_enabled: bool | None = None
+    turn_knowledge_max_matches: int | None = None
+    turn_knowledge_max_excerpt_chars: int | None = None

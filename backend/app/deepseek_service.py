@@ -9,6 +9,7 @@ import httpx
 
 from app.json_repair import parse_json_with_repair
 from app.knowledge_base import build_turn_knowledge_briefing
+from app.runtime_settings import get_runtime_settings
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-2a1d86caf93d4c21ba51be6c69bc7abd")
@@ -107,16 +108,19 @@ def build_messages(
     session: SessionState,
     history: list[TurnLog],
     action_text: str,
+    *,
+    include_knowledge: bool = True,
 ) -> list[dict[str, str]]:
-    knowledge_briefing = build_turn_knowledge_briefing(
-        seed=seed,
-        session=session,
-        history=history,
-        action_text=action_text,
-    )
     knowledge_block = ""
-    if knowledge_briefing:
-        knowledge_block = f"{knowledge_briefing}\n\n"
+    if include_knowledge:
+        knowledge_briefing = build_turn_knowledge_briefing(
+            seed=seed,
+            session=session,
+            history=history,
+            action_text=action_text,
+        )
+        if knowledge_briefing:
+            knowledge_block = f"{knowledge_briefing}\n\n"
 
     messages: list[dict[str, str]] = [{"role": "system", "content": _system_prompt(seed)}]
     messages.extend(_history_messages(history))
@@ -141,6 +145,60 @@ def build_messages(
     return messages
 
 
+def _build_request_payload(messages: list[dict[str, str]]) -> dict[str, Any]:
+    runtime_settings = get_runtime_settings()
+    payload: dict[str, Any] = {
+        "model": DEEPSEEK_MODEL,
+        "messages": messages,
+        "response_format": {"type": "json_object"},
+        "stream": False,
+        "max_tokens": runtime_settings.deepseek_max_tokens,
+    }
+    payload["thinking"] = {
+        "type": "enabled" if runtime_settings.deepseek_thinking_enabled else "disabled"
+    }
+    return payload
+
+
+def _request_completion(payload: dict[str, Any]) -> dict[str, Any]:
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+    }
+    with httpx.Client(timeout=60.0) as client:
+        response = client.post(
+            f"{DEEPSEEK_BASE_URL}/chat/completions",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def _extract_choice_metadata(data: dict[str, Any]) -> tuple[dict[str, Any], str | None, dict[str, Any] | None]:
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("DeepSeek returned no completion choices")
+
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        raise ValueError("DeepSeek returned an invalid completion choice")
+
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        raise ValueError("DeepSeek returned a completion choice without a message")
+
+    finish_reason = choice.get("finish_reason")
+    if finish_reason is not None:
+        finish_reason = str(finish_reason)
+
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        usage = None
+
+    return message, finish_reason, usage
+
+
 def request_turn_resolution(
     seed: ScenarioSeed,
     session: SessionState,
@@ -150,38 +208,65 @@ def request_turn_resolution(
     if not is_deepseek_configured():
         return None
 
-    payload = {
-        "model": DEEPSEEK_MODEL,
-        "messages": build_messages(seed, session, history, action_text),
-        "response_format": {"type": "json_object"},
-        "stream": False,
-        "max_tokens": 1200,
-    }
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-    }
+    messages = build_messages(seed, session, history, action_text, include_knowledge=True)
+    attempts = [
+        ("full-context", messages),
+        ("no-knowledge", build_messages(seed, session, history, action_text, include_knowledge=False)),
+    ]
 
-    with httpx.Client(timeout=60.0) as client:
-        response = client.post(
-            f"{DEEPSEEK_BASE_URL}/chat/completions",
-            headers=headers,
-            json=payload,
+    last_error: Exception | None = None
+    for attempt_name, attempt_messages in attempts:
+        data = _request_completion(_build_request_payload(attempt_messages))
+        message, finish_reason, usage = _extract_choice_metadata(data)
+        content = message.get("content")
+
+        logger.debug(
+            "DeepSeek completion metadata attempt=%s finish_reason=%s usage=%s content_len=%s",
+            attempt_name,
+            finish_reason,
+            usage,
+            len(content) if isinstance(content, str) else None,
         )
-        response.raise_for_status()
-        data = response.json()
+        logger.debug("DeepSeek raw response content attempt=%s: %s", attempt_name, content)
 
-    content = data["choices"][0]["message"]["content"]
-    if not content:
-        raise ValueError("DeepSeek returned empty content for turn resolution")
+        if not content:
+            last_error = ValueError(
+                f"DeepSeek returned empty content for turn resolution (attempt={attempt_name}, finish_reason={finish_reason}, usage={usage})"
+            )
+            if finish_reason == "length":
+                logger.warning(
+                    "DeepSeek response truncated before content was returned; retrying with less context. attempt=%s usage=%s",
+                    attempt_name,
+                    usage,
+                )
+                continue
+            raise last_error
 
-    logger.debug("DeepSeek raw response content: %s", content)
-    parsed = parse_json_with_repair(content)
-    return {
-        "ai_narration": str(parsed.get("ai_narration", "")).strip(),
-        "outcome_summary": str(parsed.get("outcome_summary", "")).strip(),
-        "world_update": str(parsed.get("world_update", "")).strip(),
-        "next_prompt_hint": str(parsed.get("next_prompt_hint", "")).strip(),
-        "suggested_options": parsed.get("suggested_options"),
-        "ending": parsed.get("ending"),
-    }
+        try:
+            parsed = parse_json_with_repair(content)
+        except ValueError as exc:
+            last_error = ValueError(
+                f"{exc} (attempt={attempt_name}, finish_reason={finish_reason}, usage={usage})"
+            )
+            if finish_reason == "length":
+                logger.warning(
+                    "DeepSeek response was truncated and could not be parsed; retrying with less context. attempt=%s usage=%s",
+                    attempt_name,
+                    usage,
+                )
+                continue
+            raise last_error from exc
+
+        return {
+            "ai_narration": str(parsed.get("ai_narration", "")).strip(),
+            "outcome_summary": str(parsed.get("outcome_summary", "")).strip(),
+            "world_update": str(parsed.get("world_update", "")).strip(),
+            "next_prompt_hint": str(parsed.get("next_prompt_hint", "")).strip(),
+            "suggested_options": parsed.get("suggested_options"),
+            "ending": parsed.get("ending"),
+        }
+
+    if last_error is not None:
+        raise last_error
+
+    raise ValueError("DeepSeek returned no usable completion for turn resolution")
