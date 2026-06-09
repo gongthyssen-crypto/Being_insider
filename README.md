@@ -14,12 +14,6 @@
 - `backend/`：FastAPI 后端，负责剧本 seed、会话状态、回合裁定、模型接入与 fallback
 - `scripts/`：Windows PowerShell 启停脚本，方便本地一键试用
 
-<br />
-
-本项目灵感来自于在bohack 2026上的一个项目，为本人人工智能导论结课使用，不盈利，特此说明和感谢。
-
-本项目制作之原理来自本人在bohack上对于同学的学习和拙劣的模仿，于此感谢
-
 ## 技术栈
 
 - `Frontend`：React 18、Vite 5
@@ -238,7 +232,13 @@ $env:DEEPSEEK_MODEL="deepseek-v4-pro"
 .\scripts\start-backend.ps1
 ```
 
-如果你已经启动了后端，需直接读取系统环境变量或当前 PowerShell 会话环境变量
+如果你已经启动了后端，需要先停止，再重新启动，让新环境变量生效。
+
+注意：
+
+- 当前项目没有自动加载 `.env` 文件
+- 也就是说，把变量写进一个 `.env` 文本文件本身不会自动生效
+- 现在的实现是 `os.getenv(...)` 直接读取系统环境变量或当前 PowerShell 会话环境变量
 
 ### 2. 改 prompt
 
@@ -382,4 +382,6 @@ $env:DEEPSEEK_MODEL="deepseek-v4-pro"
 - 支持不同模型供应商切换
 - 增加管理员配置页，直接在前端填写模型参数
 
-#
+## License
+
+如需开源，请按你的课程或项目要求自行补充许可证文件。

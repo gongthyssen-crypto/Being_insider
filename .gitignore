@@ -1,9 +1,9 @@
 .venv/
 .runtime/
+.knowledge_index/
 __pycache__/
 *.pyc
 node_modules/
 dist/
 coverage/
 .DS_Store
-

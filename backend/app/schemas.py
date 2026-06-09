@@ -105,3 +105,4 @@ class HealthPayload(BaseModel):
     status: str
     api_name: str
     model_mode: str
+    knowledge_mode: str

@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.content import get_scenario_seed, list_scenarios
 from app.deepseek_service import current_model_mode, request_turn_resolution
+from app.knowledge_base import current_knowledge_retrieval_mode
 from app.schemas import (
     CreateSessionRequest,
     HealthPayload,
@@ -482,6 +483,7 @@ def health() -> HealthPayload:
         status="ok",
         api_name="ai-history-sandbox",
         model_mode=current_model_mode(),
+        knowledge_mode=current_knowledge_retrieval_mode(),
     )
 
 

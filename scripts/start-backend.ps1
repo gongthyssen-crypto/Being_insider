@@ -10,6 +10,8 @@ $python = Join-Path $root ".venv\\Scripts\\python.exe"
 $backendDir = Join-Path $root "backend"
 $backendPort = 18421
 
+& (Join-Path $PSScriptRoot "load-local-env.ps1")
+
 function Get-BackendPortProcess {
     $connection = Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $connection) {
