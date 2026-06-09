@@ -12,7 +12,7 @@ from app.knowledge_base import build_turn_knowledge_briefing
 from app.runtime_settings import get_runtime_settings
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-2a1d86caf93d4c21ba51be6c69bc7abd")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 logger = logging.getLogger(__name__)
