@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import ast
 import json
+import logging
 import os
-import re
 from typing import Any
 
 import httpx
 
+from app.json_repair import parse_json_with_repair
 from app.knowledge_base import build_turn_knowledge_briefing
 from app.schemas import ScenarioSeed, SessionState, TurnLog
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-2a1d86caf93d4c21ba51be6c69bc7abd")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+logger = logging.getLogger(__name__)
 
 
 def is_deepseek_configured() -> bool:
@@ -140,141 +141,6 @@ def build_messages(
     return messages
 
 
-def _strip_markdown_code_fence(text: str) -> str:
-    stripped = text.strip()
-    if stripped.startswith("```") and stripped.endswith("```"):
-        lines = stripped.splitlines()
-        if len(lines) >= 3:
-            return "\n".join(lines[1:-1]).strip()
-    return stripped
-
-
-def _extract_json_object(text: str) -> str | None:
-    start = text.find("{")
-    if start < 0:
-        return None
-
-    depth = 0
-    in_string = False
-    escaped = False
-    for index in range(start, len(text)):
-        char = text[index]
-        if in_string:
-            if escaped:
-                escaped = False
-                continue
-            if char == "\\":
-                escaped = True
-                continue
-            if char == '"':
-                in_string = False
-            continue
-
-        if char == '"':
-            in_string = True
-            continue
-        if char == "{":
-            depth += 1
-            continue
-        if char == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start:index + 1]
-    return None
-
-
-def _escape_control_chars_in_strings(text: str) -> str:
-    result: list[str] = []
-    in_string = False
-    escaped = False
-
-    for char in text:
-        if in_string:
-            if escaped:
-                result.append(char)
-                escaped = False
-                continue
-            if char == "\\":
-                result.append(char)
-                escaped = True
-                continue
-            if char == '"':
-                result.append(char)
-                in_string = False
-                continue
-            if char == "\n":
-                result.append("\\n")
-                continue
-            if char == "\r":
-                result.append("\\r")
-                continue
-            if char == "\t":
-                result.append("\\t")
-                continue
-            result.append(char)
-            continue
-
-        result.append(char)
-        if char == '"':
-            in_string = True
-
-    return "".join(result)
-
-
-def _remove_trailing_commas(text: str) -> str:
-    return re.sub(r",(\s*[}\]])", r"\1", text)
-
-
-def _python_literal_fallback(text: str) -> dict[str, Any] | None:
-    python_like = re.sub(r"\btrue\b", "True", text)
-    python_like = re.sub(r"\bfalse\b", "False", python_like)
-    python_like = re.sub(r"\bnull\b", "None", python_like)
-    try:
-        parsed = ast.literal_eval(python_like)
-    except (SyntaxError, ValueError):
-        return None
-    if isinstance(parsed, dict):
-        return parsed
-    return None
-
-
-def _parse_json_with_repair(content: str) -> dict[str, Any]:
-    candidates: list[str] = []
-
-    def add_candidate(value: str | None) -> None:
-        if not value:
-            return
-        normalized = value.strip()
-        if normalized and normalized not in candidates:
-            candidates.append(normalized)
-
-    stripped = content.strip()
-    add_candidate(stripped)
-    add_candidate(_strip_markdown_code_fence(stripped))
-    add_candidate(_extract_json_object(stripped))
-
-    for candidate in list(candidates):
-        add_candidate(_remove_trailing_commas(candidate))
-        add_candidate(_escape_control_chars_in_strings(candidate))
-        add_candidate(_remove_trailing_commas(_escape_control_chars_in_strings(candidate)))
-
-    last_error: Exception | None = None
-    for candidate in candidates:
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError as exc:
-            last_error = exc
-            parsed = _python_literal_fallback(candidate)
-            if parsed is None:
-                continue
-        if isinstance(parsed, dict):
-            return parsed
-
-    if last_error is not None:
-        raise last_error
-    raise ValueError("DeepSeek returned content that could not be parsed as JSON")
-
-
 def request_turn_resolution(
     seed: ScenarioSeed,
     session: SessionState,
@@ -309,7 +175,8 @@ def request_turn_resolution(
     if not content:
         raise ValueError("DeepSeek returned empty content for turn resolution")
 
-    parsed = _parse_json_with_repair(content)
+    logger.debug("DeepSeek raw response content: %s", content)
+    parsed = parse_json_with_repair(content)
     return {
         "ai_narration": str(parsed.get("ai_narration", "")).strip(),
         "outcome_summary": str(parsed.get("outcome_summary", "")).strip(),
