@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 const API_ROOT = "/api";
 const DEFAULT_RUNTIME_SETTINGS = {
+  deepseek_base_url: "https://api.deepseek.com",
+  deepseek_api_key: "",
+  deepseek_model: "deepseek-v4-pro",
   deepseek_max_tokens: 4096,
   deepseek_thinking_enabled: true,
   turn_knowledge_max_matches: 4,
@@ -288,6 +291,9 @@ export default function App() {
 
     try {
       const payload = {
+        deepseek_base_url: String(settingsDraft.deepseek_base_url ?? "").trim(),
+        deepseek_api_key: String(settingsDraft.deepseek_api_key ?? "").trim(),
+        deepseek_model: String(settingsDraft.deepseek_model ?? "").trim(),
         deepseek_max_tokens: Number(settingsDraft.deepseek_max_tokens),
         deepseek_thinking_enabled: Boolean(settingsDraft.deepseek_thinking_enabled),
         turn_knowledge_max_matches: Number(settingsDraft.turn_knowledge_max_matches),
@@ -298,8 +304,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const latestHealth = await readJson("/health");
       setRuntimeSettings(saved);
       setSettingsDraft(saved);
+      setHealth(latestHealth);
     } catch (err) {
       setError("Runtime settings save failed.");
     } finally {
@@ -409,6 +417,42 @@ export default function App() {
 
               <div className="runtime-settings-grid">
                 <label className="runtime-field">
+                  <span>Chat API base URL</span>
+                  <input
+                    type="url"
+                    value={settingsDraft.deepseek_base_url}
+                    onChange={(event) =>
+                      updateSettingsField("deepseek_base_url", event.target.value)
+                    }
+                  />
+                  <small>Example: https://api.deepseek.com or your compatible gateway.</small>
+                </label>
+
+                <label className="runtime-field">
+                  <span>Chat model</span>
+                  <input
+                    type="text"
+                    value={settingsDraft.deepseek_model}
+                    onChange={(event) =>
+                      updateSettingsField("deepseek_model", event.target.value)
+                    }
+                  />
+                  <small>Example: deepseek-v4-pro.</small>
+                </label>
+
+                <label className="runtime-field">
+                  <span>API key</span>
+                  <input
+                    type="password"
+                    value={settingsDraft.deepseek_api_key}
+                    onChange={(event) =>
+                      updateSettingsField("deepseek_api_key", event.target.value)
+                    }
+                  />
+                  <small>Stored in backend runtime memory and applied on the next turn.</small>
+                </label>
+
+                <label className="runtime-field">
                   <span>DeepSeek max tokens</span>
                   <input
                     type="number"
@@ -477,7 +521,7 @@ export default function App() {
 
               <div className="runtime-settings-actions">
                 <span className="hint-chip">
-                  {`Live: ${runtimeSettings.deepseek_max_tokens} tokens / RAG ${runtimeSettings.turn_knowledge_max_matches} / ${
+                  {`Live: ${runtimeSettings.deepseek_model || "no-model"} / ${runtimeSettings.deepseek_max_tokens} tokens / RAG ${runtimeSettings.turn_knowledge_max_matches} / ${
                     runtimeSettings.deepseek_thinking_enabled ? "thinking on" : "thinking off"
                   }`}
                 </span>

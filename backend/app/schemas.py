@@ -109,6 +109,9 @@ class HealthPayload(BaseModel):
 
 
 class RuntimeSettings(BaseModel):
+    deepseek_base_url: str
+    deepseek_api_key: str
+    deepseek_model: str
     deepseek_max_tokens: int
     deepseek_thinking_enabled: bool
     turn_knowledge_max_matches: int
@@ -116,6 +119,9 @@ class RuntimeSettings(BaseModel):
 
 
 class RuntimeSettingsUpdate(BaseModel):
+    deepseek_base_url: str | None = None
+    deepseek_api_key: str | None = None
+    deepseek_model: str | None = None
     deepseek_max_tokens: int | None = None
     deepseek_thinking_enabled: bool | None = None
     turn_knowledge_max_matches: int | None = None

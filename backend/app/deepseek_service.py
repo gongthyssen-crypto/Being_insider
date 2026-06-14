@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
 import httpx
@@ -10,21 +9,27 @@ import httpx
 from app.json_repair import parse_json_with_repair
 from app.knowledge_base import build_turn_knowledge_briefing
 from app.runtime_settings import get_runtime_settings
-from app.schemas import ScenarioSeed, SessionState, TurnLog
-
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+from app.schemas import RuntimeSettings, ScenarioSeed, SessionState, TurnLog
 logger = logging.getLogger(__name__)
 
 
-def is_deepseek_configured() -> bool:
-    return bool(DEEPSEEK_API_KEY)
+def _settings_or_current(settings: RuntimeSettings | None = None) -> RuntimeSettings:
+    return settings if settings is not None else get_runtime_settings()
 
 
-def current_model_mode() -> str:
-    if is_deepseek_configured():
-        return f"deepseek-official:{DEEPSEEK_MODEL}"
+def is_deepseek_configured(settings: RuntimeSettings | None = None) -> bool:
+    runtime_settings = _settings_or_current(settings)
+    return bool(
+        runtime_settings.deepseek_api_key
+        and runtime_settings.deepseek_base_url
+        and runtime_settings.deepseek_model
+    )
+
+
+def current_model_mode(settings: RuntimeSettings | None = None) -> str:
+    runtime_settings = _settings_or_current(settings)
+    if is_deepseek_configured(runtime_settings):
+        return f"deepseek-official:{runtime_settings.deepseek_model}"
     return "seed-session-local-adjudicator-placeholder-key"
 
 
@@ -145,10 +150,12 @@ def build_messages(
     return messages
 
 
-def _build_request_payload(messages: list[dict[str, str]]) -> dict[str, Any]:
-    runtime_settings = get_runtime_settings()
+def _build_request_payload(
+    messages: list[dict[str, str]],
+    runtime_settings: RuntimeSettings,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "model": DEEPSEEK_MODEL,
+        "model": runtime_settings.deepseek_model,
         "messages": messages,
         "response_format": {"type": "json_object"},
         "stream": False,
@@ -160,14 +167,14 @@ def _build_request_payload(messages: list[dict[str, str]]) -> dict[str, Any]:
     return payload
 
 
-def _request_completion(payload: dict[str, Any]) -> dict[str, Any]:
+def _request_completion(payload: dict[str, Any], runtime_settings: RuntimeSettings) -> dict[str, Any]:
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Authorization": f"Bearer {runtime_settings.deepseek_api_key}",
     }
     with httpx.Client(timeout=60.0) as client:
         response = client.post(
-            f"{DEEPSEEK_BASE_URL}/chat/completions",
+            f"{runtime_settings.deepseek_base_url}/chat/completions",
             headers=headers,
             json=payload,
         )
@@ -205,7 +212,8 @@ def request_turn_resolution(
     history: list[TurnLog],
     action_text: str,
 ) -> dict[str, Any] | None:
-    if not is_deepseek_configured():
+    runtime_settings = get_runtime_settings()
+    if not is_deepseek_configured(runtime_settings):
         return None
 
     messages = build_messages(seed, session, history, action_text, include_knowledge=True)
@@ -216,7 +224,10 @@ def request_turn_resolution(
 
     last_error: Exception | None = None
     for attempt_name, attempt_messages in attempts:
-        data = _request_completion(_build_request_payload(attempt_messages))
+        data = _request_completion(
+            _build_request_payload(attempt_messages, runtime_settings),
+            runtime_settings,
+        )
         message, finish_reason, usage = _extract_choice_metadata(data)
         content = message.get("content")
 

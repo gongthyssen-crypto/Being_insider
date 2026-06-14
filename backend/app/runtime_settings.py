@@ -21,6 +21,9 @@ def _clamp_int(value: int, *, minimum: int, maximum: int) -> int:
 
 def _normalize_settings(settings: RuntimeSettings) -> RuntimeSettings:
     return RuntimeSettings(
+        deepseek_base_url=settings.deepseek_base_url.strip().rstrip("/"),
+        deepseek_api_key=settings.deepseek_api_key.strip(),
+        deepseek_model=settings.deepseek_model.strip(),
         deepseek_max_tokens=_clamp_int(
             settings.deepseek_max_tokens,
             minimum=512,
@@ -42,6 +45,9 @@ def _normalize_settings(settings: RuntimeSettings) -> RuntimeSettings:
 
 _runtime_settings = _normalize_settings(
     RuntimeSettings(
+        deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+        deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
         deepseek_max_tokens=int(os.getenv("DEEPSEEK_MAX_TOKENS", "4096")),
         deepseek_thinking_enabled=_env_flag("DEEPSEEK_THINKING_ENABLED", True),
         turn_knowledge_max_matches=int(os.getenv("TURN_KNOWLEDGE_MAX_MATCHES", "4")),
