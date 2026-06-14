@@ -46,7 +46,7 @@ def _normalize_settings(settings: RuntimeSettings) -> RuntimeSettings:
 _runtime_settings = _normalize_settings(
     RuntimeSettings(
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-        deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+        deepseek_api_key="",
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
         deepseek_max_tokens=int(os.getenv("DEEPSEEK_MAX_TOKENS", "4096")),
         deepseek_thinking_enabled=_env_flag("DEEPSEEK_THINKING_ENABLED", True),

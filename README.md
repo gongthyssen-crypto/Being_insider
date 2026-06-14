@@ -132,7 +132,7 @@ proxy: {
 1. 前端调用 `POST /api/sessions/{session_id}/turns`
 2. 后端在 `backend/app/routers/story.py` 中读取当前 session 和历史回合
 3. 后端把当前剧本 seed、世界状态、最近历史和玩家输入交给 `backend/app/deepseek_service.py`
-4. 如果配置了可用的 `DEEPSEEK_API_KEY`，就请求外部模型 API
+4. 如果前端运行时设置里填了可用的聊天 `API key / base URL / model`，就请求外部模型 API
 5. 如果没有配置 key，或者外部请求报错，就自动走本地 fallback
 6. 后端把新的回合结果、阶段性结局、世界变化写回 session store
 7. 前端刷新页面状态，显示本轮推演结果和时间轴记录
@@ -143,7 +143,7 @@ proxy: {
 
 在 `backend/app/routers/story.py` 里，后端会先尝试调用 `request_turn_resolution(...)`。如果：
 
-- 没有配置 `DEEPSEEK_API_KEY`
+- 没有在前端运行时设置中填写聊天 `API key`
 - 外部模型请求超时
 - 外部模型返回空内容
 - 外部模型返回的 JSON 无法解析
@@ -154,7 +154,7 @@ proxy: {
 
 - 你要做前端联调，不一定非要先配真实模型 key
 - 你要演示完整流程，也可以先用 fallback 跑通
-- 你要看真实大模型效果，再补环境变量即可
+- 你要看真实大模型效果，再在前端运行时设置里补聊天配置即可
 
 ### 5. 当前会话数据存在哪里
 
@@ -211,28 +211,25 @@ proxy: {
 
 如果你上传到 GitHub 后，别人要接自己的模型、换供应商、改 prompt，最常用的是下面这几个文件。
 
-### 1. 改模型环境变量
+### 1. 改运行时模型配置
 
 模型配置入口在：
 
-- `backend/app/deepseek_service.py`
+- `frontend/src/App.jsx`
+- `backend/app/runtime_settings.py`
 
-当前后端直接从环境变量读取：
+当前默认配置来源如下：
 
-- `DEEPSEEK_API_KEY`
 - `DEEPSEEK_BASE_URL`
 - `DEEPSEEK_MODEL`
 
-在 PowerShell 里，当前终端临时配置方式如下：
+推荐方式是直接在首页的 Runtime Settings 面板里填写：
 
-```powershell
-$env:DEEPSEEK_API_KEY="你的真实 key"
-$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
-$env:DEEPSEEK_MODEL="deepseek-v4-pro"
-.\scripts\start-backend.ps1
-```
+- `Chat API base URL`
+- `Chat model`
+- `API key`
 
-如果你已经启动了后端，需要先停止，再重新启动，让新环境变量生效。
+这些设置保存后会立即进入后端运行时内存，下一回合直接生效，不需要重启。
 
 注意：
 
@@ -316,7 +313,7 @@ $env:DEEPSEEK_MODEL="deepseek-v4-pro"
 
 如果你是第一次接自己的模型，建议按这个顺序改：
 
-1. 先只设置 `DEEPSEEK_API_KEY`，确认 `/api/health` 里模型模式不是 fallback
+1. 先在前端运行时设置里填 `API key / base URL / model`，确认 `/api/health` 里模型模式不是 fallback
 2. 再打一轮实际推演，确认 `POST /api/sessions/{session_id}/turns` 能正常返回
 3. 如果想调风格，先改 `_system_prompt(seed)`
 4. 如果想让模型看到更多上下文，再改 `build_messages(...)`
@@ -329,7 +326,7 @@ $env:DEEPSEEK_MODEL="deepseek-v4-pro"
 
 本仓库现在不会再内置默认的真实 key，但你仍然要注意：
 
-- 不要把真实 `DEEPSEEK_API_KEY` 写死进代码
+- 不要把真实聊天 `API key` 写死进代码
 - 不要把带 key 的启动脚本提交到仓库
 - 不要把本机环境导出文件提交到仓库
 
